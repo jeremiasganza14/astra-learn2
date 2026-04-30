@@ -104,6 +104,7 @@ def init_db():
             id {serial_type},
             subject_id INTEGER NOT NULL,
             name TEXT NOT NULL,
+            content TEXT,
             FOREIGN KEY(subject_id) REFERENCES subjects(id)
         )
     ''')
@@ -125,7 +126,6 @@ def init_db():
     ''')
     conn.commit()
     
-    # Try adding the SRS columns safely if the table already exists from older versions
     try:
         c.execute('ALTER TABLE cards ADD COLUMN next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
         c.execute('ALTER TABLE cards ADD COLUMN interval INTEGER DEFAULT 0')
@@ -134,6 +134,13 @@ def init_db():
     except Exception:
         if IS_POSTGRES:
             conn.rollback() # Rollback the transaction block if column exists in Postgres
+            
+    try:
+        c.execute('ALTER TABLE topics ADD COLUMN content TEXT')
+        conn.commit()
+    except Exception:
+        if IS_POSTGRES:
+            conn.rollback()
     
     c.close()
     conn.close()
@@ -192,9 +199,9 @@ def add_subject(user_id, name, icon='fa-book', color='#4F46E5'):
     conn.close()
     return subject_id
 
-def add_topic(subject_id, name):
+def add_topic(subject_id, name, content=""):
     conn = get_db_connection()
-    topic_id = execute_query(conn, 'INSERT INTO topics (subject_id, name) VALUES (?, ?)', (subject_id, name), commit=True, returning_id=True)
+    topic_id = execute_query(conn, 'INSERT INTO topics (subject_id, name, content) VALUES (?, ?, ?)', (subject_id, name, content), commit=True, returning_id=True)
     conn.close()
     return topic_id
 

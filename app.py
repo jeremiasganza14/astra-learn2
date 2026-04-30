@@ -1,7 +1,7 @@
 import os
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
-from ai_service import process_pdf_and_generate_cards, generate_test_from_cards
+from ai_service import process_pdf_and_generate_cards, generate_test_from_cards, extract_text_from_pdf
 import database
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
@@ -106,7 +106,8 @@ def extract_cards(current_user_id, subject_id):
         
         try:
             topic_name = file.filename.replace('.pdf', '')
-            topic_id = database.add_topic(subject_id, topic_name)
+            raw_text = extract_text_from_pdf(filepath)
+            topic_id = database.add_topic(subject_id, topic_name, raw_text)
             
             import threading
             def background_process():
@@ -183,17 +184,13 @@ def api_delete_subject(current_user_id, subject_id):
 @token_required
 def get_topic_audio_script(current_user_id, topic_id):
     conn = database.get_db_connection()
-    cards = database.execute_query(conn, 'SELECT text, "desc" FROM cards WHERE topic_id = ?', (topic_id,), fetchall=True)
+    topic = database.execute_query(conn, 'SELECT content FROM topics WHERE id = ?', (topic_id,), fetchone=True)
     conn.close()
     
-    if not cards:
-        return jsonify({"script": "No hay contenido para leer. Sube un documento primero."}), 200
+    if not topic or not topic.get('content'):
+        return jsonify({"script": "El PDF original de este tema no está guardado. Por favor bórralo y vuelve a subirlo para poder leerlo."}), 200
         
-    script = "Modo podcast iniciado. "
-    for i, c in enumerate(cards):
-        script += f"Punto {i+1}. {c['text']}. Respuesta: {c['desc']} "
-        
-    return jsonify({"script": script}), 200
+    return jsonify({"script": topic['content']}), 200
 @app.route('/api/topics/<int:topic_id>', methods=['DELETE'])
 @token_required
 def api_delete_topic(current_user_id, topic_id):
