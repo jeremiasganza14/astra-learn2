@@ -116,11 +116,25 @@ def init_db():
             text TEXT,
             "desc" TEXT,
             status TEXT DEFAULT 'new',
+            next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            interval INTEGER DEFAULT 0,
+            ease_factor REAL DEFAULT 2.5,
             FOREIGN KEY(subject_id) REFERENCES subjects(id),
             FOREIGN KEY(topic_id) REFERENCES topics(id)
         )
     ''')
     conn.commit()
+    
+    # Try adding the SRS columns safely if the table already exists from older versions
+    try:
+        c.execute('ALTER TABLE cards ADD COLUMN next_review TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+        c.execute('ALTER TABLE cards ADD COLUMN interval INTEGER DEFAULT 0')
+        c.execute('ALTER TABLE cards ADD COLUMN ease_factor REAL DEFAULT 2.5')
+        conn.commit()
+    except Exception:
+        if IS_POSTGRES:
+            conn.rollback() # Rollback the transaction block if column exists in Postgres
+    
     c.close()
     conn.close()
 
@@ -196,7 +210,8 @@ def get_cards_for_topic(topic_id, status_filter=None, limit=20):
     if status_filter:
         cards = execute_query(conn, 'SELECT id, type, text, "desc", status FROM cards WHERE topic_id = ? AND status = ? ORDER BY RANDOM() LIMIT ?', (topic_id, status_filter, limit), fetchall=True)
     else:
-        cards = execute_query(conn, 'SELECT id, type, text, "desc", status FROM cards WHERE topic_id = ? AND status != ? ORDER BY RANDOM() LIMIT ?', (topic_id, 'known', limit), fetchall=True)
+        # SRS: Only fetch cards that are due for review (next_review <= now)
+        cards = execute_query(conn, 'SELECT id, type, text, "desc", status FROM cards WHERE topic_id = ? AND next_review <= CURRENT_TIMESTAMP ORDER BY RANDOM() LIMIT ?', (topic_id, limit), fetchall=True)
     conn.close()
     return cards
 
@@ -206,9 +221,37 @@ def get_cards_for_subject_test(subject_id, limit=20):
     conn.close()
     return cards
 
-def update_card_status(card_id, new_status):
+def update_card_status(card_id, new_status, direction=None):
     conn = get_db_connection()
-    execute_query(conn, 'UPDATE cards SET status = ? WHERE id = ?', (new_status, card_id), commit=True)
+    if direction:
+        # Implement SM-2 Algorithm
+        card = execute_query(conn, 'SELECT interval, ease_factor FROM cards WHERE id = ?', (card_id,), fetchone=True)
+        if card:
+            interval = card.get('interval') or 0
+            ease = card.get('ease_factor') or 2.5
+            
+            if direction == 'right': # Correct
+                if interval == 0:
+                    interval = 1
+                elif interval == 1:
+                    interval = 6
+                else:
+                    interval = int(interval * ease)
+                ease = min(3.0, ease + 0.1)
+                new_status = 'known'
+            else: # Incorrect
+                interval = 0
+                ease = max(1.3, ease - 0.2)
+                new_status = 'learning'
+                
+            import datetime
+            next_review = datetime.datetime.utcnow() + datetime.timedelta(days=interval)
+            next_review_str = next_review.strftime('%Y-%m-%d %H:%M:%S')
+            
+            execute_query(conn, 'UPDATE cards SET status = ?, interval = ?, ease_factor = ?, next_review = ? WHERE id = ?', 
+                          (new_status, interval, ease, next_review_str, card_id), commit=True)
+    else:
+        execute_query(conn, 'UPDATE cards SET status = ? WHERE id = ?', (new_status, card_id), commit=True)
     conn.close()
 
 def delete_subject(subject_id):

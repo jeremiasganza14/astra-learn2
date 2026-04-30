@@ -279,8 +279,8 @@ function renderSubjectDetail(container) {
             topicCard.style = 'background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:12px;';
             topicCard.innerHTML = `
                 <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items: center;">
-                    <h4 style="font-size:16px; font-weight:700;">${t.name}</h4>
-                    <div style="display:flex; align-items:center; gap: 12px;">
+                    <h4 style="font-size:16px; font-weight:700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;" title="${t.name}">${t.name}</h4>
+                    <div style="display:flex; align-items:center; gap: 12px; flex-shrink: 0;">
                         <span style="font-size:14px; font-weight:700; color:var(--primary);">${t.progress}%</span>
                         <button onclick="deleteTopic(${t.id}, ${subject.id})" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size: 14px;">
                             <i class="fa-solid fa-trash"></i>
@@ -514,11 +514,20 @@ function renderTinder(container) {
             }
             
             card.innerHTML = `
-                <div style="background: #EEF2FF; color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 20px; display:inline-block; letter-spacing: 0.5px; text-transform: uppercase;">${c.type || 'Concepto'}</div>
-                <h2 style="font-size:22px; margin-bottom:16px;">${c.text}</h2>
-                <div style="font-size:15px; color:var(--text-muted); text-align:left; width:100%; max-height:250px; overflow-y:auto; line-height:1.6; padding-right:8px;">${c.desc}</div>
-                <div class="swipe-overlay like" style="position:absolute; top:30px; left:30px; border: 4px solid #10B981; color:#10B981; padding:5px 10px; border-radius:10px; font-weight:900; font-size:24px; opacity:0; transform:rotate(-15deg); pointer-events:none;">CLARÍSIMO</div>
-                <div class="swipe-overlay nope" style="position:absolute; top:30px; right:30px; border: 4px solid #EF4444; color:#EF4444; padding:5px 10px; border-radius:10px; font-weight:900; font-size:24px; opacity:0; transform:rotate(15deg); pointer-events:none;">ME FALTA</div>
+                <div class="tinder-card-inner" onclick="this.parentElement.classList.toggle('flipped'); document.getElementById('swipe-hint-${index}').style.display='block';">
+                    <div class="tinder-card-front">
+                        <div style="background: #EEF2FF; color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 20px; display:inline-block; letter-spacing: 0.5px; text-transform: uppercase;">${c.type || 'Concepto'}</div>
+                        <h2 style="font-size:24px; margin-bottom:16px;">${c.text}</h2>
+                        <div style="margin-top: 24px; color: var(--primary); font-weight: bold; font-size: 14px; animation: pulse 2s infinite;"><i class="fa-solid fa-hand-pointer"></i> Toca para girar y ver respuesta</div>
+                    </div>
+                    <div class="tinder-card-back">
+                        <h3 style="font-size:18px; margin-bottom:16px; color:var(--text-main);">${c.text}</h3>
+                        <div style="font-size:16px; color:var(--text-muted); text-align:left; width:100%; max-height:300px; overflow-y:auto; line-height:1.6; padding-right:8px;">${c.desc}</div>
+                        <div id="swipe-hint-${index}" style="display:none; margin-top: 24px; color: var(--text-muted); font-size: 13px; font-weight: bold;"><i class="fa-solid fa-arrows-left-right"></i> Ahora desliza la tarjeta (Swipe)</div>
+                    </div>
+                </div>
+                <div class="swipe-overlay like" style="position:absolute; top:30px; left:30px; border: 4px solid #10B981; color:#10B981; padding:5px 10px; border-radius:10px; font-weight:900; font-size:24px; opacity:0; transform:rotate(-15deg); pointer-events:none; z-index: 10;">CLARÍSIMO</div>
+                <div class="swipe-overlay nope" style="position:absolute; top:30px; right:30px; border: 4px solid #EF4444; color:#EF4444; padding:5px 10px; border-radius:10px; font-weight:900; font-size:24px; opacity:0; transform:rotate(15deg); pointer-events:none; z-index: 10;">ME FALTA</div>
             `;
             
             if (index === 0) initSwipe(card, c.id);
@@ -530,12 +539,9 @@ function renderTinder(container) {
     buttons.className = 'swipe-buttons';
     if (state.currentCards.length > 0) {
         buttons.innerHTML = `
-            <button class="swipe-btn btn-red" onclick="window.simulateSwipe('left')" style="width:54px; height:54px; font-size:20px;">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <button class="swipe-btn btn-green" onclick="window.simulateSwipe('right')" style="width:54px; height:54px; font-size:20px;">
-                <i class="fa-solid fa-check"></i>
-            </button>
+            <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-top: 10px;">
+                Toca la tarjeta para voltearla. Luego deslízala hacia la derecha (<span style="color:#10B981;font-weight:bold;">Aprendida</span>) o hacia la izquierda (<span style="color:#EF4444;font-weight:bold;">Repasar pronto</span>).
+            </p>
         `;
     }
     
@@ -549,10 +555,13 @@ function initSwipe(card, dbId) {
 
     const startDrag = (e) => {
         if (e.target.tagName.toLowerCase() === 'div' && e.target.style.overflowY === 'auto') return;
+        if (!card.classList.contains('flipped')) return; // Solo permitir swipe si la tarjeta fue volteada
         isDragging = true;
         startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
         startY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
-        card.style.transition = 'none'; card.style.cursor = 'grabbing';
+        const inner = card.querySelector('.tinder-card-inner');
+        if (inner) inner.style.transition = 'none'; 
+        card.style.cursor = 'grabbing';
     };
 
     const drag = (e) => {
@@ -560,7 +569,9 @@ function initSwipe(card, dbId) {
         const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
         const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
         currentX = clientX - startX; currentY = clientY - startY;
-        card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${currentX * 0.05}deg)`;
+        const inner = card.querySelector('.tinder-card-inner');
+        // Transform the inner card while keeping it flipped
+        if (inner) inner.style.transform = `translate(${currentX}px, ${currentY}px) rotateY(180deg) rotateZ(${currentX * 0.05}deg)`;
         
         if (currentX > 0) {
             likeOverlay.style.opacity = currentX / 100; nopeOverlay.style.opacity = 0;
@@ -575,8 +586,11 @@ function initSwipe(card, dbId) {
         if (currentX > 100) handleSwipeOut(card, 'right', dbId);
         else if (currentX < -100) handleSwipeOut(card, 'left', dbId);
         else {
-            card.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            card.style.transform = 'translate(0px, 0px) rotate(0deg)';
+            const inner = card.querySelector('.tinder-card-inner');
+            if (inner) {
+                inner.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                inner.style.transform = 'translate(0px, 0px) rotateY(180deg) rotateZ(0deg)';
+            }
             nopeOverlay.style.opacity = 0; likeOverlay.style.opacity = 0;
         }
     };
@@ -596,9 +610,12 @@ function initSwipe(card, dbId) {
 
 async function handleSwipeOut(card, direction, dbId) {
     if (card.cleanupSwipe) card.cleanupSwipe();
-    card.style.transition = 'transform 0.4s ease-out, opacity 0.4s ease-out';
-    card.style.transform = `translate(${direction === 'right' ? window.innerWidth : -window.innerWidth}px, ${direction === 'right' ? 100 : -100}px) rotate(${direction === 'right' ? 30 : -30}deg)`;
-    card.style.opacity = '0';
+    const inner = card.querySelector('.tinder-card-inner');
+    if (inner) {
+        inner.style.transition = 'transform 0.4s ease-out, opacity 0.4s ease-out';
+        inner.style.transform = `translate(${direction === 'right' ? window.innerWidth : -window.innerWidth}px, ${direction === 'right' ? 100 : -100}px) rotateY(180deg) rotateZ(${direction === 'right' ? 30 : -30}deg)`;
+        inner.style.opacity = '0';
+    }
     
     if (direction === 'right') card.querySelector('.like').style.opacity = 1;
     else card.querySelector('.nope').style.opacity = 1;

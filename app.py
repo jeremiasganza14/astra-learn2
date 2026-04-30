@@ -136,8 +136,8 @@ def get_topic_cards(current_user_id, topic_id):
 def swipe_card(current_user_id, card_id):
     data = request.json
     direction = data.get('direction')
-    new_status = 'known' if direction == 'right' else 'learning'
-    database.update_card_status(card_id, new_status)
+    # Call database with direction to handle SM-2 Spaced Repetition logic
+    database.update_card_status(card_id, None, direction=direction)
     return jsonify({"success": True}), 200
 
 @app.route('/api/tests/generate', methods=['POST'])

@@ -25,9 +25,8 @@ def process_pdf_and_generate_cards(filepath):
     Eres un tutor universitario experto. Convierte el siguiente texto en flashcards.
     Tu tarea es EXTRAER EL 100% de la información útil. NO RESUMAS. NO OMITAS NADA.
     
-    REGLA ESTRICTA: Si el texto es largo (más de 3 páginas), DEBES generar un MÍNIMO de 40 a 60 flashcards.
-    Debes desglosar cada párrafo, cada concepto, cada lista y cada detalle en su propia tarjeta separada.
-    No agrupes conceptos. Si hay 5 características de algo, crea 5 tarjetas distintas.
+    REGLA ESTRICTA 1: Genera entre 60 y 80 flashcards para un texto de longitud estándar (ej. 10 páginas). No generes una cantidad excesiva (evita pasar de 80) pero asegúrate de cubrir todo el material.
+    REGLA ESTRICTA 2: La respuesta ('desc') de CADA flashcard DEBE ser exhaustiva, bien desarrollada y con una explicación lógica profunda. No uses simplemente palabras sueltas. Queremos explicaciones ricas que ayuden a comprender el concepto a fondo.
     
     Devuelve EXCLUSIVAMENTE en formato JSON válido, una lista de objetos:
     [
@@ -42,13 +41,12 @@ def process_pdf_and_generate_cards(filepath):
     {text}
     """
     
-    response = model.generate_content(prompt)
+    response = model.generate_content(
+        prompt,
+        generation_config={"response_mime_type": "application/json"}
+    )
     raw_response = response.text.strip()
-    if raw_response.startswith('```json'): raw_response = raw_response[7:]
-    if raw_response.startswith('```'): raw_response = raw_response[3:]
-    if raw_response.endswith('```'): raw_response = raw_response[:-3]
-        
-    return json.loads(raw_response.strip())
+    return json.loads(raw_response)
 
 def generate_test_from_cards(cards):
     if not API_KEY:
@@ -80,10 +78,9 @@ def generate_test_from_cards(cards):
     {cards_json}
     """
     
-    response = model.generate_content(prompt)
+    response = model.generate_content(
+        prompt,
+        generation_config={"response_mime_type": "application/json"}
+    )
     raw_response = response.text.strip()
-    if raw_response.startswith('```json'): raw_response = raw_response[7:]
-    if raw_response.startswith('```'): raw_response = raw_response[3:]
-    if raw_response.endswith('```'): raw_response = raw_response[:-3]
-        
-    return json.loads(raw_response.strip())
+    return json.loads(raw_response)
