@@ -294,6 +294,9 @@ function renderSubjectDetail(container) {
                     <button class="t-btn test-btn" style="flex:1; padding:10px; border-radius:10px; border:none; background:#FEF2F2; color:#EF4444; font-weight:700; cursor:pointer;">
                         <i class="fa-solid fa-bolt"></i> Test Rápido
                     </button>
+                    <button class="t-btn audio-btn" style="flex:1; padding:10px; border-radius:10px; border:none; background:#F3E8FF; color:#9333EA; font-weight:700; cursor:pointer;">
+                        <i class="fa-solid fa-headphones"></i> Podcast
+                    </button>
                 </div>
             `;
             
@@ -311,6 +314,10 @@ function renderSubjectDetail(container) {
             };
             
             topicCard.querySelector('.test-btn').onclick = () => startTest({topic_id: t.id, limit: 5});
+            
+            topicCard.querySelector('.audio-btn').onclick = () => {
+                openAudioPlayer(t.id, t.name);
+            };
             
             container.appendChild(topicCard);
         });
@@ -646,6 +653,147 @@ function renderBottomNav() {
         nav.appendChild(div);
     });
     appContainer.appendChild(nav);
+}
+
+let currentUtterance = null;
+
+async function openAudioPlayer(topicId, topicName) {
+    state.currentView = 'audio_player';
+    appContainer.innerHTML = `
+        <div style="padding:24px; text-align:center; height:100vh; display:flex; flex-direction:column; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                <button onclick="stopAudio(); state.currentView='subject'; render();" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-main);"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2 style="font-size:20px; font-weight:700;">Modo Podcast</h2>
+                <div style="width:20px;"></div>
+            </div>
+            
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height: 400px;">
+                <div style="width:180px; height:180px; border-radius:90px; background:linear-gradient(135deg, var(--primary), #9333EA); display:flex; justify-content:center; align-items:center; margin-bottom:32px; box-shadow:0 10px 30px rgba(147, 51, 234, 0.4); animation: pulse-slow 3s infinite;">
+                    <i class="fa-solid fa-headphones" style="font-size:80px; color:white;"></i>
+                </div>
+                <h3 style="font-size:24px; font-weight:800; margin-bottom:12px; line-height:1.2;">${topicName}</h3>
+                <p style="color:var(--text-muted); font-size:16px; margin-bottom:32px;" id="audio-status"><i class="fa-solid fa-spinner fa-spin"></i> Cargando guion...</p>
+                
+                <div style="width:100%; max-width:320px; background:var(--surface); padding:24px; border-radius:24px; border:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,0.05);">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <label style="font-size:14px; font-weight:700;">Velocidad:</label>
+                        <span id="speed-label" style="font-weight:800; color:var(--primary);">1.0x</span>
+                    </div>
+                    <input type="range" id="audio-speed" min="0.5" max="2.0" step="0.1" value="1.0" style="width:100%; margin-bottom:32px; accent-color: var(--primary);">
+                    
+                    <div style="display:flex; justify-content:center; gap:24px;">
+                        <button id="btn-play-pause" style="width:72px; height:72px; border-radius:36px; background:var(--primary); color:white; border:none; font-size:28px; cursor:pointer; box-shadow:0 8px 20px rgba(79,70,229,0.3); transition: transform 0.2s;">
+                            <i class="fa-solid fa-play" style="margin-left: 4px;"></i>
+                        </button>
+                        <button onclick="stopAudio()" style="width:72px; height:72px; border-radius:36px; background:#FEE2E2; color:#EF4444; border:none; font-size:28px; cursor:pointer; transition: transform 0.2s;">
+                            <i class="fa-solid fa-stop"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    try {
+        const res = await authFetch('/api/topics/' + topicId + '/audio');
+        const data = await res.json();
+        
+        const statusEl = document.getElementById('audio-status');
+        const btnPlay = document.getElementById('btn-play-pause');
+        const speedInput = document.getElementById('audio-speed');
+        const speedLabel = document.getElementById('speed-label');
+        
+        statusEl.innerHTML = '<i class="fa-solid fa-check-circle"></i> Listo para escuchar';
+        statusEl.style.color = '#10B981';
+        
+        let isPlaying = false;
+        let scriptText = data.script;
+        
+        speedInput.oninput = (e) => {
+            speedLabel.innerText = parseFloat(e.target.value).toFixed(1) + 'x';
+            if (isPlaying && currentUtterance) {
+                // Changing speed while speaking requires restarting the utterance.
+                // We'll just let it apply to the next one, or we can restart it (complex without position tracking).
+                // But for now, we'll let it be.
+            }
+        };
+        
+        btnPlay.onclick = () => {
+            btnPlay.style.transform = 'scale(0.9)';
+            setTimeout(() => btnPlay.style.transform = 'scale(1)', 100);
+            
+            if (isPlaying) {
+                window.speechSynthesis.pause();
+                isPlaying = false;
+                btnPlay.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 4px;"></i>';
+                statusEl.innerHTML = '<i class="fa-solid fa-pause"></i> Pausado';
+                statusEl.style.color = '#F59E0B';
+            } else {
+                if (window.speechSynthesis.paused && currentUtterance) {
+                    window.speechSynthesis.resume();
+                } else {
+                    playText(scriptText, parseFloat(speedInput.value));
+                }
+                isPlaying = true;
+                btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                statusEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Reproduciendo...';
+                statusEl.style.color = 'var(--primary)';
+            }
+        };
+        
+    } catch(e) {
+        document.getElementById('audio-status').innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error al cargar';
+        document.getElementById('audio-status').style.color = '#EF4444';
+    }
+}
+
+function playText(text, rate) {
+    window.speechSynthesis.cancel(); 
+    currentUtterance = new SpeechSynthesisUtterance(text);
+    currentUtterance.lang = 'es-ES';
+    currentUtterance.rate = rate;
+    
+    // Select the best voice available
+    const voices = window.speechSynthesis.getVoices();
+    const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
+    if (spanishVoices.length > 0) {
+        // Try to find a premium/enhanced voice (like Monica or Jorge in MacOS)
+        const premium = spanishVoices.find(v => v.name.includes('Premium') || v.name.includes('Enhanced') || v.name.includes('Jorge') || v.name.includes('Monica'));
+        currentUtterance.voice = premium || spanishVoices[0];
+    }
+    
+    currentUtterance.onend = () => {
+        const btnPlay = document.getElementById('btn-play-pause');
+        if (btnPlay) btnPlay.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 4px;"></i>';
+        const statusEl = document.getElementById('audio-status');
+        if (statusEl) {
+            statusEl.innerHTML = '<i class="fa-solid fa-check"></i> Finalizado';
+            statusEl.style.color = '#10B981';
+        }
+    };
+    
+    currentUtterance.onerror = (e) => {
+        console.error("SpeechSynthesis error:", e);
+    };
+    
+    window.speechSynthesis.speak(currentUtterance);
+}
+
+window.stopAudio = function() {
+    window.speechSynthesis.cancel();
+    currentUtterance = null;
+    const btnPlay = document.getElementById('btn-play-pause');
+    if (btnPlay) btnPlay.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 4px;"></i>';
+    const statusEl = document.getElementById('audio-status');
+    if (statusEl && statusEl.innerText.includes("Reproduciendo")) {
+        statusEl.innerHTML = '<i class="fa-solid fa-stop"></i> Detenido';
+        statusEl.style.color = 'var(--text-muted)';
+    }
+}
+
+// Force load voices to avoid empty voice list on first play
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
 
 window.goHome = () => { state.currentView = 'home'; state.currentSubjectId = null; render(); }

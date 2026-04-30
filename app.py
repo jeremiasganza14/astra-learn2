@@ -179,6 +179,21 @@ def api_delete_subject(current_user_id, subject_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/topics/<int:topic_id>/audio', methods=['GET'])
+@token_required
+def get_topic_audio_script(current_user_id, topic_id):
+    conn = database.get_db_connection()
+    cards = database.execute_query(conn, 'SELECT text, "desc" FROM cards WHERE topic_id = ?', (topic_id,), fetchall=True)
+    conn.close()
+    
+    if not cards:
+        return jsonify({"script": "No hay contenido para leer. Sube un documento primero."}), 200
+        
+    script = "Modo podcast iniciado. "
+    for i, c in enumerate(cards):
+        script += f"Punto {i+1}. {c['text']}. Respuesta: {c['desc']} "
+        
+    return jsonify({"script": script}), 200
 @app.route('/api/topics/<int:topic_id>', methods=['DELETE'])
 @token_required
 def api_delete_topic(current_user_id, topic_id):
