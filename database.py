@@ -114,7 +114,7 @@ def init_db():
             topic_id INTEGER NOT NULL,
             type TEXT,
             text TEXT,
-            desc TEXT,
+            "desc" TEXT,
             status TEXT DEFAULT 'new',
             FOREIGN KEY(subject_id) REFERENCES subjects(id),
             FOREIGN KEY(topic_id) REFERENCES topics(id)
@@ -187,22 +187,22 @@ def add_topic(subject_id, name):
 def save_cards(subject_id, topic_id, cards_list):
     conn = get_db_connection()
     for card in cards_list:
-        execute_query(conn, 'INSERT INTO cards (subject_id, topic_id, type, text, desc, status) VALUES (?, ?, ?, ?, ?, ?)',
+        execute_query(conn, 'INSERT INTO cards (subject_id, topic_id, type, text, "desc", status) VALUES (?, ?, ?, ?, ?, ?)',
                   (subject_id, topic_id, card.get('type', 'Concepto'), card.get('text', ''), card.get('desc', ''), 'new'), commit=True)
     conn.close()
 
 def get_cards_for_topic(topic_id, status_filter=None, limit=20):
     conn = get_db_connection()
     if status_filter:
-        cards = execute_query(conn, 'SELECT id, type, text, desc, status FROM cards WHERE topic_id = ? AND status = ? ORDER BY RANDOM() LIMIT ?', (topic_id, status_filter, limit), fetchall=True)
+        cards = execute_query(conn, 'SELECT id, type, text, "desc", status FROM cards WHERE topic_id = ? AND status = ? ORDER BY RANDOM() LIMIT ?', (topic_id, status_filter, limit), fetchall=True)
     else:
-        cards = execute_query(conn, 'SELECT id, type, text, desc, status FROM cards WHERE topic_id = ? AND status != ? ORDER BY RANDOM() LIMIT ?', (topic_id, 'known', limit), fetchall=True)
+        cards = execute_query(conn, 'SELECT id, type, text, "desc", status FROM cards WHERE topic_id = ? AND status != ? ORDER BY RANDOM() LIMIT ?', (topic_id, 'known', limit), fetchall=True)
     conn.close()
     return cards
 
 def get_cards_for_subject_test(subject_id, limit=20):
     conn = get_db_connection()
-    cards = execute_query(conn, 'SELECT id, type, text, desc, status FROM cards WHERE subject_id = ? AND status = ? ORDER BY RANDOM() LIMIT ?', (subject_id, 'known', limit), fetchall=True)
+    cards = execute_query(conn, 'SELECT id, type, text, "desc", status FROM cards WHERE subject_id = ? AND status = ? ORDER BY RANDOM() LIMIT ?', (subject_id, 'known', limit), fetchall=True)
     conn.close()
     return cards
 
