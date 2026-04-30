@@ -337,9 +337,14 @@ window.uploadPDF = async (subjectId) => {
     try {
         const res = await authFetch(`/api/extract/${subjectId}`, { method: 'POST', body: formData });
         const data = await res.json();
-        if (res.ok && data.count) {
-            if(statusBox) statusBox.innerHTML = `<span style="color: #10B981;"><i class="fa-solid fa-check"></i> ¡Éxito! Se generaron ${data.count} tarjetas.</span>`;
-            setTimeout(() => { loadTopics(subjectId).then(() => render()); }, 2000);
+        if (res.ok) {
+            if (data.count === "Pendiente") {
+                if(statusBox) statusBox.innerHTML = `<span style="color: #F59E0B;"><i class="fa-solid fa-clock"></i> PDF recibido. La IA está procesándolo en segundo plano. Las tarjetas aparecerán aquí en un par de minutos.</span>`;
+                setTimeout(() => { loadTopics(subjectId).then(() => render()); }, 3000);
+            } else if (data.count) {
+                if(statusBox) statusBox.innerHTML = `<span style="color: #10B981;"><i class="fa-solid fa-check"></i> ¡Éxito! Se generaron ${data.count} tarjetas.</span>`;
+                setTimeout(() => { loadTopics(subjectId).then(() => render()); }, 2000);
+            }
         } else {
             if(statusBox) statusBox.innerHTML = `<span style="color: #EF4444;"><i class="fa-solid fa-triangle-exclamation"></i> Error del servidor: ${data.error || 'Desconocido'}</span>`;
             if(btn) { btn.disabled = false; btn.style.opacity = '1'; }

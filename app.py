@@ -108,9 +108,18 @@ def extract_cards(current_user_id, subject_id):
             topic_name = file.filename.replace('.pdf', '')
             topic_id = database.add_topic(subject_id, topic_name)
             
-            cards = process_pdf_and_generate_cards(filepath)
-            database.save_cards(subject_id, topic_id, cards)
-            return jsonify({"message": "Extracción exitosa", "count": len(cards), "topic_id": topic_id}), 200
+            import threading
+            def background_process():
+                try:
+                    cards = process_pdf_and_generate_cards(filepath)
+                    database.save_cards(subject_id, topic_id, cards)
+                except Exception as e:
+                    print(f"Error in background process: {e}")
+                    
+            thread = threading.Thread(target=background_process)
+            thread.start()
+            
+            return jsonify({"message": "Procesando en segundo plano", "count": "Pendiente", "topic_id": topic_id}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     
